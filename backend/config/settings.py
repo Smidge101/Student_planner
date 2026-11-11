@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'core',
+    'planner',
 ]
 
 MIDDLEWARE = [
