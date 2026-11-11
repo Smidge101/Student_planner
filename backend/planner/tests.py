@@ -152,3 +152,53 @@ class XPTests(TestCase):
         self.assertEqual(Assignment.objects.count(), 0)
         self.assertEqual(XPEvent.objects.count(), 0)
         self.assertEqual(Profile.objects.count(), 0)
+
+
+class OwnershipTests(TestCase):
+    """User B must never see or change user A's data through the API."""
+
+    def setUp(self):
+        self.ana = make_user('ana')
+        self.ben = make_user('ben')
+        self.ana_term = Term.objects.create(
+            user=self.ana, name='Ana Fall', start_date=date(2026, 8, 25), end_date=date(2026, 12, 15)
+        )
+        self.client.force_login(self.ben)
+
+    def test_list_shows_only_own_rows(self):
+        Term.objects.create(
+            user=self.ben, name='Ben Fall', start_date=date(2026, 8, 25), end_date=date(2026, 12, 15)
+        )
+        names = [t['name'] for t in self.client.get('/api/terms/').json()]
+        self.assertEqual(names, ['Ben Fall'])
+
+    def test_cannot_read_update_or_delete_another_users_row(self):
+        url = f'/api/terms/{self.ana_term.pk}/'
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(
+            self.client.patch(url, {'name': 'hacked'}, content_type='application/json').status_code, 404
+        )
+        self.assertEqual(self.client.delete(url).status_code, 404)
+        self.ana_term.refresh_from_db()
+        self.assertEqual(self.ana_term.name, 'Ana Fall')
+
+    def test_create_always_belongs_to_the_logged_in_user(self):
+        response = self.client.post(
+            '/api/terms/',
+            {'name': 'Spring', 'start_date': '2027-01-10', 'end_date': '2027-05-01', 'user': self.ana.pk},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Term.objects.get(pk=response.json()['id']).user, self.ben)
+
+    def test_api_rejects_term_ending_before_start(self):
+        response = self.client.post(
+            '/api/terms/',
+            {'name': 'Bad', 'start_date': '2027-05-01', 'end_date': '2027-01-10'},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_logged_out_users_get_nothing(self):
+        self.client.logout()
+        self.assertEqual(self.client.get('/api/terms/').status_code, 403)

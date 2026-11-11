@@ -103,6 +103,7 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        'OPTIONS': {'user_attributes': ('username', 'full_name', 'email')},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
@@ -146,3 +147,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# API defaults: logged-in session required everywhere unless a view opts out.
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        # Login and signup attempts per client IP.
+        'auth': '10/min',
+    },
+}
+
+# Sessions last two weeks; the React app reads the CSRF cookie to send it back.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
+CSRF_COOKIE_HTTPONLY = False
