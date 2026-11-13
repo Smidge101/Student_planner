@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 
 import App from './App'
 import { ThemeSync } from './components/RouteGuards'
+import ToastProvider from './components/Toasts'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -17,8 +18,10 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ThemeSync />
-        <App />
+        <ToastProvider>
+          <ThemeSync />
+          <App />
+        </ToastProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

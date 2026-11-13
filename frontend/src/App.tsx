@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { GuestOnly, RequireAuth } from './components/RouteGuards'
 import AppLayout from './components/AppLayout'
+import ClassDetail from './pages/ClassDetail'
+import Classes from './pages/Classes'
 import Dashboard from './pages/Dashboard'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -18,7 +20,8 @@ export default function App() {
 
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/classes" element={<Placeholder title="My Classes" phase="Class management" />} />
+        <Route path="/classes" element={<Classes />} />
+        <Route path="/classes/:id" element={<ClassDetail />} />
         <Route path="/calendar" element={<Placeholder title="Calendar" phase="Calendar and scheduling" />} />
         <Route path="/pomodoro" element={<Placeholder title="Pomodoro" phase="Pomodoro timer" />} />
         <Route path="/settings" element={<Placeholder title="Settings" phase="Settings and customization" />} />

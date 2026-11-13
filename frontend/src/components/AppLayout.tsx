@@ -10,6 +10,7 @@ import {
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { useLogout } from '../auth'
+import AchievementWatcher from './AchievementWatcher'
 import Logo from './Logo'
 
 const NAV = [
@@ -28,6 +29,7 @@ export default function AppLayout() {
   return (
     <div className="app">
       <a href="#main" className="skip-link">Skip to content</a>
+      <AchievementWatcher />
       <aside className="sidebar">
         <NavLink to="/dashboard" className="sidebar-logo" aria-label="StudyWebPlanner dashboard">
           <Logo />

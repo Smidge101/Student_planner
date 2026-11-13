@@ -69,3 +69,40 @@ export interface Dashboard {
   achievements: UnlockedAchievement[]
   has_courses: boolean
 }
+
+export interface Meeting {
+  weekday: number // 0 = Monday … 6 = Sunday
+  start_time: string // "10:00:00"
+  end_time: string
+  location: string
+}
+
+export interface Course {
+  id: number
+  name: string
+  color: PastelColor
+  term: number | null
+  meetings: Meeting[]
+  open_tasks: number
+  created_at: string
+}
+
+export type TaskKind = 'homework' | 'quiz' | 'exam'
+
+export interface Assignment {
+  id: number
+  course: number | null
+  title: string
+  description: string
+  kind: TaskKind
+  due_at: string
+  completed_at: string | null
+  xp: number
+  created_at: string
+}
+
+export interface NewAchievement {
+  slug: string
+  name: string
+  description: string
+}

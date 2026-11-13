@@ -282,6 +282,8 @@ class UserAchievement(models.Model):
     )
     achievement = models.ForeignKey(Achievement, on_delete=models.CASCADE)
     unlocked_at = models.DateTimeField(auto_now_add=True)
+    # False until the app has shown the "achievement unlocked" popup.
+    seen = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -289,3 +291,21 @@ class UserAchievement(models.Model):
                 fields=['user', 'achievement'], name='unlock_achievement_once'
             ),
         ]
+
+
+class Activity(models.Model):
+    """Things that leave no other trace but count toward hidden achievements,
+    e.g. deleting a class (the class row itself is gone afterwards)."""
+
+    class Kind(models.TextChoices):
+        COURSE_DELETED = 'course_deleted', 'Deleted a class'
+        POMODORO_STOPPED = 'pomodoro_stopped', 'Stopped the Pomodoro timer'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='activities'
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['user', 'kind', 'created_at'])]

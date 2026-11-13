@@ -1,25 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
-  Bird,
-  BookOpen,
   CalendarDays,
-  CalendarHeart,
-  CheckCheck,
+  Check,
   Clock,
-  Crown,
-  Flame,
-  Footprints,
-  Hand,
-  Hourglass,
   Lightbulb,
-  ListPlus,
   Lock,
   MapPin,
   Moon,
   Sun,
-  Timer,
-  type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -27,21 +16,10 @@ import { api } from '../api'
 import { useMe, useUpdateProfile } from '../auth'
 import { PALETTE, PALETTE_KEYS, courseColorStyle } from '../theme'
 import type { Dashboard as DashboardData, DashboardTask, Me } from '../types'
+import { badgeIcon } from '../badges'
 import { formatDue, formatEventTime } from '../dates'
-
-const BADGE_ICONS: Record<string, LucideIcon> = {
-  'most-classes': BookOpen,
-  'baby-steps': Footprints,
-  trailblazer: Flame,
-  ceo: Crown,
-  phoenix: Bird,
-  'more-more-more': ListPlus,
-  'ultimate-task-taker': CheckCheck,
-  'study-study-study': Timer,
-  'bye-bye-byee': Hand,
-  'time-traveler': Hourglass,
-  'busy-bee': CalendarHeart,
-}
+import { useToggleAssignment } from '../queries'
+import { useToast } from '../toast'
 
 export default function Dashboard() {
   const { data: me } = useMe()
@@ -70,22 +48,10 @@ export default function Dashboard() {
               <Link to="/classes" className="panel-link">View all <ArrowRight aria-hidden="true" /></Link>
             </div>
             {data && data.upcoming_tasks.length === 0 && (
-              <p className="empty">No tasks yet. Add work from a class page to see it here.</p>
+              <p className="empty">No tasks yet. Open a class to add work.</p>
             )}
             <ul className="item-list">
-              {data?.upcoming_tasks.map((task) => (
-                <li key={task.id} className="item" style={courseColorStyle(task.course?.color)}>
-                  <span className="item-bar" aria-hidden="true" />
-                  <div>
-                    <p className="item-title">{task.title}</p>
-                    <p className={`item-meta${task.overdue ? ' overdue' : ''}`}>
-                      {formatDue(task.due_at)}
-                      {task.course && <> · {task.course.name}</>}
-                    </p>
-                  </div>
-                  <span className="xp-chip">+{task.xp} XP</span>
-                </li>
-              ))}
+              {data?.upcoming_tasks.map((task) => <DashboardTaskRow key={task.id} task={task} />)}
             </ul>
           </section>
 
@@ -148,7 +114,7 @@ function WelcomeCard({ me, achievements }: { me: Me; achievements?: DashboardDat
         <ul className="badges" aria-label="Achievements">
           {achievements?.length ? (
             achievements.map((a) => {
-              const Icon = BADGE_ICONS[a.slug] ?? Crown
+              const Icon = badgeIcon(a.slug)
               return (
                 <li key={a.slug} className="badge" title={`${a.name}: ${a.description}`}>
                   <Icon aria-hidden="true" />
@@ -188,6 +154,44 @@ function WelcomeCard({ me, achievements }: { me: Me; achievements?: DashboardDat
         {update.isError && <small className="field-error" role="alert">Couldn't save that. Try again.</small>}
       </div>
     </section>
+  )
+}
+
+function DashboardTaskRow({ task }: { task: DashboardTask }) {
+  const toggle = useToggleAssignment()
+  const toast = useToast()
+  return (
+    <li className="item item-task" style={courseColorStyle(task.course?.color)}>
+      <button
+        className="check-button"
+        role="checkbox"
+        aria-checked={false}
+        aria-label={`Mark done: ${task.title}`}
+        disabled={toggle.isPending}
+        onClick={() =>
+          toggle.mutate(
+            { id: task.id, done: true },
+            {
+              onSuccess: ({ xp_change }) =>
+                xp_change > 0 && toast({ title: `+${xp_change} XP`, text: `Finished "${task.title}"` }),
+              onError: () => toast({ title: "Couldn't update that task", text: 'Please try again.' }),
+            },
+          )
+        }
+      >
+        {toggle.isPending && <Check aria-hidden="true" />}
+      </button>
+      <div>
+        <p className="item-title">
+          {task.course ? <Link to={`/classes/${task.course.id}`}>{task.title}</Link> : task.title}
+        </p>
+        <p className={`item-meta${task.overdue ? ' overdue' : ''}`}>
+          {formatDue(task.due_at)}
+          {task.course && <> · {task.course.name}</>}
+        </p>
+      </div>
+      <span className="xp-chip">+{task.xp} XP</span>
+    </li>
   )
 }
 
