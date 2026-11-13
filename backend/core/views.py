@@ -8,7 +8,12 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from .serializers import LoginSerializer, SignupSerializer, me_payload
+from .serializers import (
+    LoginSerializer,
+    ProfileUpdateSerializer,
+    SignupSerializer,
+    me_payload,
+)
 
 User = get_user_model()
 
@@ -85,6 +90,13 @@ def logout_view(request):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 def me(request):
+    """GET: who is logged in. PATCH: change display name or theme."""
+    if request.method == 'PATCH':
+        serializer = ProfileUpdateSerializer(
+            request.user.profile, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
     return Response(me_payload(request.user))

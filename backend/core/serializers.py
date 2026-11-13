@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from planner import progress
+from planner.models import Profile
 
 User = get_user_model()
 
@@ -56,6 +57,14 @@ class SignupSerializer(serializers.Serializer):
         return user
 
 
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """The profile fields the dashboard and settings can change."""
+
+    class Meta:
+        model = Profile
+        fields = ['display_name', 'theme_mode', 'accent_color']
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
@@ -81,5 +90,6 @@ def me_payload(user):
         },
         'xp': xp,
         'level': level,
+        'level_xp': progress.xp_for_level(level),
         'next_level_xp': progress.xp_for_level(level + 1),
     }

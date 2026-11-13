@@ -202,3 +202,49 @@ class OwnershipTests(TestCase):
     def test_logged_out_users_get_nothing(self):
         self.client.logout()
         self.assertEqual(self.client.get('/api/terms/').status_code, 403)
+
+
+class DashboardTests(TestCase):
+    def setUp(self):
+        self.ana = make_user('ana')
+        self.client.force_login(self.ana)
+        now = timezone.now()
+        course = Course.objects.create(user=self.ana, name='Bio', color='mint')
+        Assignment.objects.create(user=self.ana, course=course, title='Overdue lab', due_at=now - timedelta(days=1))
+        Assignment.objects.create(user=self.ana, title='Essay', due_at=now + timedelta(days=2))
+        done = Assignment.objects.create(user=self.ana, title='Done already', due_at=now + timedelta(days=1))
+        progress.complete_assignment(done)
+        CalendarEvent.objects.create(
+            user=self.ana, title='Study group', start_at=now + timedelta(days=1),
+            end_at=now + timedelta(days=1, hours=1),
+        )
+        CalendarEvent.objects.create(
+            user=self.ana, title='Far away', start_at=now + timedelta(days=30),
+            end_at=now + timedelta(days=30, hours=1),
+        )
+        # Another user's data must never appear.
+        ben = make_user('ben')
+        Assignment.objects.create(user=ben, title='Ben task', due_at=now + timedelta(hours=1))
+
+    def test_dashboard_lists_own_upcoming_work(self):
+        body = self.client.get('/api/dashboard/').json()
+        self.assertEqual([t['title'] for t in body['upcoming_tasks']], ['Overdue lab', 'Essay'])
+        self.assertTrue(body['upcoming_tasks'][0]['overdue'])
+        self.assertEqual(body['upcoming_tasks'][0]['course']['color'], 'mint')
+        self.assertEqual([e['title'] for e in body['upcoming_events']], ['Study group'])
+        self.assertTrue(body['has_courses'])
+
+    def test_profile_theme_can_be_changed(self):
+        response = self.client.patch(
+            '/api/auth/me/', {'theme_mode': 'dark', 'accent_color': 'mint'},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['profile']['accent_color'], 'mint')
+        self.assertEqual(response.json()['profile']['theme_mode'], 'dark')
+
+    def test_invalid_theme_color_is_rejected(self):
+        response = self.client.patch(
+            '/api/auth/me/', {'accent_color': 'neon'}, content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
