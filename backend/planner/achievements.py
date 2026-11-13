@@ -6,11 +6,12 @@ The frontend learns about new unlocks from the "unseen" feed and shows a popup.
 """
 
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from django.db.models import Count
 from django.utils import timezone
 
-from .models import Achievement, Activity, Assignment, Course, UserAchievement
+from .models import Achievement, Activity, Assignment, CalendarEvent, Course, UserAchievement
 
 # "In one sitting" means within this window.
 SITTING = timedelta(minutes=30)
@@ -25,6 +26,7 @@ MOST_CLASSES_OVER = 6          # more than 6 classes in one term
 TASKS_ADDED_IN_SITTING = 20    # more, More, MORE
 TASKS_DONE_IN_SITTING = 10     # Ultimate Task Taker
 CLASSES_DELETED_IN_SITTING = 3  # Bye Bye Byee!~
+EVENTS_IN_A_WEEK = 10          # Busy Bee
 
 
 def unlock(user, slug):
@@ -78,3 +80,16 @@ def after_course_deleted(user):
     ).count()
     if recent >= CLASSES_DELETED_IN_SITTING:
         unlock(user, 'bye-bye-byee')
+
+
+def after_event_saved(event):
+    """Busy Bee: 10 events in the same Monday-Sunday week (user's time zone)."""
+    tz = ZoneInfo(event.user.profile.timezone)
+    local = event.start_at.astimezone(tz)
+    week_start = (local - timedelta(days=local.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = week_start + timedelta(days=7)
+    in_week = CalendarEvent.objects.filter(
+        user=event.user, start_at__gte=week_start, start_at__lt=week_end
+    ).count()
+    if in_week >= EVENTS_IN_A_WEEK:
+        unlock(event.user, 'busy-bee')

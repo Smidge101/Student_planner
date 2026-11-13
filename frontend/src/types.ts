@@ -106,3 +106,16 @@ export interface NewAchievement {
   name: string
   description: string
 }
+
+export interface CalendarEvent {
+  id: number
+  course: number | null
+  title: string
+  description: string
+  location: string
+  start_at: string
+  end_at: string
+  completed_at: string | null
+  xp: number
+  created_at: string
+}

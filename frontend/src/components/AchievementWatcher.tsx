@@ -37,7 +37,7 @@ export default function AchievementWatcher() {
   useEffect(() => {
     if (!me) return
     if (lastLevel.current !== null && me.level > lastLevel.current) {
-      toast({ title: `Level up! You're level ${me.level}`, icon: Sparkles, variant: 'achievement' })
+      toast({ kicker: 'Level up!', title: `You're now level ${me.level}`, icon: Sparkles, variant: 'achievement' })
     }
     lastLevel.current = me.level
   }, [me, toast])

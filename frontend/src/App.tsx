@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { GuestOnly, RequireAuth } from './components/RouteGuards'
 import AppLayout from './components/AppLayout'
+import Calendar from './pages/Calendar'
 import ClassDetail from './pages/ClassDetail'
 import Classes from './pages/Classes'
 import Dashboard from './pages/Dashboard'
@@ -22,7 +23,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/classes" element={<Classes />} />
         <Route path="/classes/:id" element={<ClassDetail />} />
-        <Route path="/calendar" element={<Placeholder title="Calendar" phase="Calendar and scheduling" />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/pomodoro" element={<Placeholder title="Pomodoro" phase="Pomodoro timer" />} />
         <Route path="/settings" element={<Placeholder title="Settings" phase="Settings and customization" />} />
         <Route path="/help" element={<Placeholder title="Help" phase="Help page and bug reports" />} />

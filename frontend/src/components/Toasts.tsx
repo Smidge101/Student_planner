@@ -26,7 +26,7 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={show}>
       {children}
       <div className="toasts" role="status" aria-live="polite">
-        {toasts.map(({ id, title, text, icon: Icon, variant = 'info' }) => (
+        {toasts.map(({ id, title, text, icon: Icon, variant = 'info', kicker }) => (
           <div key={id} className={`toast toast-${variant}`}>
             {Icon && (
               <span className="toast-icon" aria-hidden="true">
@@ -34,7 +34,9 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
               </span>
             )}
             <div className="toast-body">
-              {variant === 'achievement' && <p className="toast-kicker">Achievement unlocked</p>}
+              {(kicker || variant === 'achievement') && (
+                <p className="toast-kicker">{kicker ?? 'Achievement unlocked'}</p>
+              )}
               <p className="toast-title">{title}</p>
               {text && <p className="toast-text">{text}</p>}
             </div>

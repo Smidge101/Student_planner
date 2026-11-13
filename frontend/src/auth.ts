@@ -28,6 +28,7 @@ export interface SignupData {
   password: string
   password_confirm: string
   email_reminders: boolean
+  timezone?: string
 }
 
 export function useSignup() {
@@ -65,8 +66,13 @@ export function useLogout() {
 export function useUpdateProfile() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (data: Partial<Pick<Me['profile'], 'theme_mode' | 'accent_color'>> & { display_name?: string }) =>
+    mutationFn: (data: Partial<Pick<Me['profile'], 'theme_mode' | 'accent_color' | 'timezone'>> & { display_name?: string }) =>
       api<Me>('/auth/me/', 'PATCH', data),
     onSuccess: (me) => queryClient.setQueryData(ME_KEY, me),
   })
+}
+
+/** The browser's IANA time zone, e.g. "America/New_York". */
+export function browserTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 }

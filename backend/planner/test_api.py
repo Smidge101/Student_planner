@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . import progress
-from .models import Activity, Assignment, Course, UserAchievement, XPEvent
+from .models import Activity, Assignment, CalendarEvent, Course, UserAchievement, XPEvent
 
 User = get_user_model()
 JSON = 'application/json'
@@ -212,3 +212,84 @@ class AchievementUnlockTests(APITest):
         self.assertEqual(self.client.get('/api/achievements/unseen/').json(), [])
         # Still unlocked, just not "new".
         self.assertEqual(len(self.client.get('/api/dashboard/').json()['achievements']), 2)
+
+
+class CalendarEventAPITests(APITest):
+    def add_event(self, title='Study group', start=None, hours=1, **extra):
+        start = start or timezone.now() + timedelta(days=1)
+        response = self.post('/api/events/', {
+            'title': title, 'start_at': start.isoformat(),
+            'end_at': (start + timedelta(hours=hours)).isoformat(), **extra,
+        })
+        self.assertEqual(response.status_code, 201, response.content)
+        return response.json()
+
+    def test_create_and_complete_for_xp(self):
+        event = self.add_event(location='Library')
+        self.assertEqual(event['xp'], 20)
+        response = self.post(f"/api/events/{event['id']}/complete/")
+        self.assertEqual(response.json()['xp_change'], 20)
+        self.assertEqual(self.post(f"/api/events/{event['id']}/complete/").json()['xp_change'], 0)
+        self.assertEqual(self.post(f"/api/events/{event['id']}/uncomplete/").json()['xp_change'], -20)
+        self.assertEqual(progress.total_xp(self.ana), 0)
+
+    def test_end_must_not_be_before_start(self):
+        start = timezone.now()
+        response = self.post('/api/events/', {
+            'title': 'Backwards', 'start_at': start.isoformat(),
+            'end_at': (start - timedelta(hours=1)).isoformat(),
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('end_at', response.json())
+
+    def test_range_filter_returns_overlapping_events(self):
+        base = timezone.now().replace(microsecond=0) + timedelta(days=10)
+        self.add_event('Inside', start=base)
+        self.add_event('Before', start=base - timedelta(days=5))
+        self.add_event('Spans start', start=base - timedelta(hours=2), hours=3)
+        start = (base - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        end = (base + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        titles = {e['title'] for e in self.client.get(f'/api/events/?start={start}&end={end}').json()}
+        self.assertEqual(titles, {'Inside', 'Spans start'})
+
+    def test_bad_range_is_a_400(self):
+        self.assertEqual(self.client.get('/api/events/?start=yesterday').status_code, 400)
+
+    def test_task_due_date_filter(self):
+        self.add_task(title='Soon', days=1)
+        self.add_task(title='Later', days=20)
+        before = (timezone.now() + timedelta(days=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        titles = [t['title'] for t in self.client.get(f'/api/assignments/?due_before={before}').json()]
+        self.assertEqual(titles, ['Soon'])
+
+    def test_cannot_see_or_complete_another_users_event(self):
+        ben = make_user('ben')
+        now = timezone.now()
+        bens = CalendarEvent.objects.create(user=ben, title='Ben event', start_at=now, end_at=now)
+        self.assertEqual(self.client.get('/api/events/').json(), [])
+        self.assertEqual(self.post(f'/api/events/{bens.pk}/complete/').status_code, 404)
+        self.assertEqual(self.client.delete(f'/api/events/{bens.pk}/').status_code, 404)
+
+    def test_busy_bee_after_ten_events_in_one_week(self):
+        monday = (timezone.now() + timedelta(days=14)).replace(hour=9, minute=0, second=0, microsecond=0)
+        monday -= timedelta(days=monday.weekday())
+        for i in range(9):
+            self.add_event(f'E{i}', start=monday + timedelta(hours=i * 12))
+        self.add_event('Next week', start=monday + timedelta(days=8))
+        self.assertNotIn('busy-bee', self.unlocked())
+        self.add_event('Tenth', start=monday + timedelta(days=5))
+        self.assertIn('busy-bee', self.unlocked())
+
+    def test_signup_stores_browser_time_zone(self):
+        self.client.logout()
+        response = self.post('/api/auth/signup/', {
+            'full_name': 'Cara Diaz', 'email': 'cara@example.com', 'username': 'cara',
+            'password': 'pastel-planner-42', 'password_confirm': 'pastel-planner-42',
+            'timezone': 'America/Chicago',
+        })
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['profile']['timezone'], 'America/Chicago')
+
+    def test_invalid_time_zone_rejected(self):
+        response = self.patch('/api/auth/me/', {'timezone': 'Mars/Olympus'})
+        self.assertEqual(response.status_code, 400)

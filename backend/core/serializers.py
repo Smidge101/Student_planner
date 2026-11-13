@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from planner import progress
-from planner.models import Profile
+from planner.models import Profile, validate_timezone
 
 User = get_user_model()
 
@@ -21,6 +21,8 @@ class SignupSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
     email_reminders = serializers.BooleanField(default=True)
+    # The browser's zone, e.g. "America/New_York"; used for weeks and reminders.
+    timezone = serializers.CharField(required=False, validators=[validate_timezone])
 
     def validate_email(self, value):
         value = value.strip().lower()
@@ -53,7 +55,8 @@ class SignupSerializer(serializers.Serializer):
             full_name=data['full_name'].strip(),
         )
         user.profile.email_reminders = data['email_reminders']
-        user.profile.save(update_fields=['email_reminders'])
+        user.profile.timezone = data.get('timezone', 'UTC')
+        user.profile.save(update_fields=['email_reminders', 'timezone'])
         return user
 
 
@@ -62,7 +65,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ['display_name', 'theme_mode', 'accent_color']
+        fields = ['display_name', 'theme_mode', 'accent_color', 'timezone']
 
 
 class LoginSerializer(serializers.Serializer):

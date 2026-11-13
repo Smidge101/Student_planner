@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from . import progress
-from .models import Assignment, ClassMeeting, Course, Term
+from .models import Assignment, CalendarEvent, ClassMeeting, Course, Term
 
 
 class OwnedPrimaryKeyField(serializers.PrimaryKeyRelatedField):
@@ -120,3 +120,32 @@ class AssignmentSerializer(serializers.ModelSerializer):
         if self.instance and self.instance.completed_at and value != self.instance.kind:
             raise serializers.ValidationError('Un-complete the task before changing its type.')
         return value
+
+
+class CalendarEventSerializer(serializers.ModelSerializer):
+    course = OwnedPrimaryKeyField(queryset=Course.objects.all(), allow_null=True, required=False)
+    xp = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CalendarEvent
+        fields = [
+            'id', 'course', 'title', 'description', 'location', 'start_at', 'end_at',
+            'completed_at', 'xp', 'created_at',
+        ]
+        read_only_fields = ['completed_at', 'created_at']
+
+    def get_xp(self, obj):
+        return progress.XP_PER_EVENT
+
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Give the event a title.')
+        return value
+
+    def validate(self, data):
+        start = data.get('start_at', getattr(self.instance, 'start_at', None))
+        end = data.get('end_at', getattr(self.instance, 'end_at', None))
+        if start and end and end < start:
+            raise serializers.ValidationError({'end_at': 'An event must end after it starts.'})
+        return data

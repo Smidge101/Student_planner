@@ -1,17 +1,36 @@
-from datetime import timedelta
+from datetime import timedelta, timezone as dt_timezone
 
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
-from rest_framework import status, viewsets
+from django.utils.dateparse import parse_datetime
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
 from . import achievements, progress
 from .models import Assignment, CalendarEvent, ClassMeeting, Course, Term, UserAchievement
-from .serializers import AssignmentSerializer, CourseSerializer, TermSerializer
+from .serializers import (
+    AssignmentSerializer,
+    CalendarEventSerializer,
+    CourseSerializer,
+    TermSerializer,
+)
 
 DASHBOARD_LIST_SIZE = 5
 UPCOMING_EVENT_DAYS = 7
+
+
+def _datetime_param(params, name):
+    """Optional ISO datetime query parameter, e.g. ?start=2026-11-01T00:00:00Z."""
+    raw = params.get(name)
+    if not raw:
+        return None
+    value = parse_datetime(raw)
+    if value is None:
+        raise serializers.ValidationError({name: 'Use an ISO date-time, e.g. 2026-11-01T00:00:00Z.'})
+    if timezone.is_naive(value):
+        value = value.replace(tzinfo=dt_timezone.utc)
+    return value
 
 
 class OwnedViewSet(viewsets.ModelViewSet):
@@ -60,7 +79,7 @@ class CourseViewSet(OwnedViewSet):
 
 
 class AssignmentViewSet(OwnedViewSet):
-    """Tasks. Filter with ?course=<id> and ?status=open|done."""
+    """Tasks. Filter with ?course=<id>, ?status=open|done, ?due_after= and ?due_before=."""
 
     serializer_class = AssignmentSerializer
 
@@ -73,6 +92,10 @@ class AssignmentViewSet(OwnedViewSet):
             qs = qs.filter(completed_at__isnull=True)
         elif params.get('status') == 'done':
             qs = qs.filter(completed_at__isnull=False).order_by('-completed_at')
+        if due_after := _datetime_param(params, 'due_after'):
+            qs = qs.filter(due_at__gte=due_after)
+        if due_before := _datetime_param(params, 'due_before'):
+            qs = qs.filter(due_at__lt=due_before)
         return qs
 
     def perform_create(self, serializer):
@@ -95,6 +118,43 @@ class AssignmentViewSet(OwnedViewSet):
     @action(detail=True, methods=['post'])
     def uncomplete(self, request, pk=None):
         return self._toggle(progress.uncomplete_assignment)
+
+
+class CalendarEventViewSet(OwnedViewSet):
+    """Calendar events. ?start= and ?end= return events overlapping that range."""
+
+    serializer_class = CalendarEventSerializer
+
+    def get_queryset(self):
+        qs = CalendarEvent.objects.filter(user=self.request.user).select_related('course')
+        params = self.request.query_params
+        if start := _datetime_param(params, 'start'):
+            qs = qs.filter(end_at__gte=start)
+        if end := _datetime_param(params, 'end'):
+            qs = qs.filter(start_at__lt=end)
+        return qs
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        achievements.after_event_saved(serializer.instance)
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        achievements.after_event_saved(serializer.instance)
+
+    def _toggle(self, change):
+        event = self.get_object()
+        xp_change = change(event)
+        event.refresh_from_db()
+        return Response({'event': self.get_serializer(event).data, 'xp_change': xp_change})
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        return self._toggle(progress.complete_event)
+
+    @action(detail=True, methods=['post'])
+    def uncomplete(self, request, pk=None):
+        return self._toggle(progress.uncomplete_event)
 
 
 @api_view(['GET'])

@@ -4,10 +4,10 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
-import type { Assignment, Course, Meeting, PastelColor, TaskKind } from './types'
+import type { Assignment, CalendarEvent, Course, Meeting, PastelColor, TaskKind } from './types'
 
 export function refreshAfterChange(queryClient: QueryClient, deletedCourseId?: number) {
-  for (const key of ['courses', 'assignments', 'dashboard', 'me', 'achievements-unseen']) {
+  for (const key of ['courses', 'assignments', 'events', 'dashboard', 'me', 'achievements-unseen']) {
     queryClient.invalidateQueries({
       queryKey: [key],
       // Don't refetch a class that was just deleted (it would 404).
@@ -100,6 +100,58 @@ export function useToggleAssignment() {
         `/assignments/${id}/${done ? 'complete' : 'uncomplete'}/`,
         'POST',
       ),
+    onSuccess: () => refreshAfterChange(queryClient),
+  })
+}
+
+// ---------- Calendar ----------
+
+/** Events overlapping [start, end) and tasks due in it. */
+export function useCalendarRange(start: Date, end: Date) {
+  const range = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`
+  const due = `due_after=${encodeURIComponent(start.toISOString())}&due_before=${encodeURIComponent(end.toISOString())}`
+  const events = useQuery({
+    queryKey: ['events', start.toISOString(), end.toISOString()],
+    queryFn: () => api<CalendarEvent[]>(`/events/?${range}`),
+  })
+  const tasks = useQuery({
+    queryKey: ['assignments', { start: start.toISOString(), end: end.toISOString() }],
+    queryFn: () => api<Assignment[]>(`/assignments/?${due}`),
+  })
+  return { events, tasks }
+}
+
+export interface EventInput {
+  title: string
+  description: string
+  location: string
+  start_at: string
+  end_at: string
+  course: number | null
+}
+
+export function useSaveEvent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: number; data: EventInput }) =>
+      id ? api<CalendarEvent>(`/events/${id}/`, 'PATCH', data) : api<CalendarEvent>('/events/', 'POST', data),
+    onSuccess: () => refreshAfterChange(queryClient),
+  })
+}
+
+export function useDeleteEvent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/events/${id}/`, 'DELETE'),
+    onSuccess: () => refreshAfterChange(queryClient),
+  })
+}
+
+export function useToggleEvent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, done }: { id: number; done: boolean }) =>
+      api<{ event: CalendarEvent; xp_change: number }>(`/events/${id}/${done ? 'complete' : 'uncomplete'}/`, 'POST'),
     onSuccess: () => refreshAfterChange(queryClient),
   })
 }

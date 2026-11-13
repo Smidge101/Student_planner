@@ -8,6 +8,8 @@ export interface Toast {
   icon?: LucideIcon
   /** "achievement" gets the bigger unlocked-badge style. */
   variant?: 'info' | 'achievement'
+  /** Small heading above the title; achievements default to "Achievement unlocked". */
+  kicker?: string
 }
 
 export const ToastContext = createContext<(toast: Omit<Toast, 'id'>) => void>(() => {})

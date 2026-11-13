@@ -75,3 +75,55 @@ export function defaultDue() {
   d.setHours(23, 59, 0, 0)
   return toLocalInput(d)
 }
+
+// ---------- Calendar grid ----------
+
+export function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+export function addDays(d: Date, days: number) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, d.getHours(), d.getMinutes())
+}
+
+/** The Sunday that starts d's week (the calendar shows Sun–Sat, like the mockup). */
+export function startOfWeek(d: Date) {
+  return addDays(startOfDay(d), -d.getDay())
+}
+
+export function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+/** Our meetings use 0 = Monday; JavaScript's getDay() uses 0 = Sunday. */
+export function meetingWeekday(d: Date) {
+  return (d.getDay() + 6) % 7
+}
+
+/** A Date on `day` at "HH:MM[:SS]". */
+export function atTime(day: Date, hhmm: string) {
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m)
+}
+
+const monthTitle = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' })
+const dayMonth = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const fullDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+
+export const formatMonthTitle = (d: Date) => monthTitle.format(d)
+export const formatFullDay = (d: Date) => fullDay.format(d)
+export const formatTime = (d: Date) => time.format(d)
+
+/** "Nov 8 – Nov 14, 2026" */
+export function formatWeekTitle(start: Date) {
+  const end = addDays(start, 6)
+  return `${dayMonth.format(start)} – ${dayMonth.format(end)}, ${end.getFullYear()}`
+}
+
+/** "Thursday, November 12 · 4:00 PM – 5:00 PM" */
+export function formatRange(start: Date, end: Date) {
+  const sameDate = sameDay(start, end)
+  return sameDate
+    ? `${fullDay.format(start)} · ${time.format(start)} – ${time.format(end)}`
+    : `${fullDay.format(start)}, ${time.format(start)} – ${fullDay.format(end)}, ${time.format(end)}`
+}

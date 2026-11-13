@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { ApiError } from '../api'
-import { useSignup, type SignupData } from '../auth'
+import { browserTimeZone, useSignup, type SignupData } from '../auth'
 import AuthCard from '../components/AuthCard'
 
 const EMPTY: SignupData = {
@@ -29,7 +29,7 @@ export default function Signup() {
   function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (mismatch) return
-    signup.mutate(form, { onSuccess: () => navigate('/dashboard', { replace: true }) })
+    signup.mutate({ ...form, timezone: browserTimeZone() }, { onSuccess: () => navigate('/dashboard', { replace: true }) })
   }
 
   const fields: { key: keyof SignupData; label: string; type?: string; autoComplete: string; hint?: string }[] = [

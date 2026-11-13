@@ -7,9 +7,10 @@ import {
   Settings,
   Timer,
 } from 'lucide-react'
+import { useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
-import { useLogout } from '../auth'
+import { browserTimeZone, useLogout, useMe, useUpdateProfile } from '../auth'
 import AchievementWatcher from './AchievementWatcher'
 import Logo from './Logo'
 
@@ -25,6 +26,16 @@ const NAV = [
 export default function AppLayout() {
   const logout = useLogout()
   const navigate = useNavigate()
+  const { data: me } = useMe()
+  const updateProfile = useUpdateProfile()
+
+  // Accounts made before time zones were saved still say UTC: fix that once.
+  const zone = browserTimeZone()
+  const needsZone = me?.profile.timezone === 'UTC' && zone !== 'UTC'
+  const { mutate: saveProfile } = updateProfile
+  useEffect(() => {
+    if (needsZone) saveProfile({ timezone: zone })
+  }, [needsZone, zone, saveProfile])
 
   return (
     <div className="app">
