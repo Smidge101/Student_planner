@@ -11,12 +11,13 @@ import type {
   Course,
   Meeting,
   PastelColor,
+  PomodoroSession,
   ProgressSummary,
   TaskKind,
 } from './types'
 
 export function refreshAfterChange(queryClient: QueryClient, deletedCourseId?: number) {
-  for (const key of ['courses', 'assignments', 'events', 'dashboard', 'me', 'achievements-unseen', 'achievements', 'progress']) {
+  for (const key of ['courses', 'assignments', 'events', 'dashboard', 'me', 'achievements-unseen', 'achievements', 'progress', 'pomodoro']) {
     queryClient.invalidateQueries({
       queryKey: [key],
       // Don't refetch a class that was just deleted (it would 404).
@@ -173,4 +174,39 @@ export function useAchievements() {
 
 export function useProgressSummary() {
   return useQuery({ queryKey: ['progress'], queryFn: () => api<ProgressSummary>('/progress/') })
+}
+
+// ---------- Pomodoro ----------
+
+export function useActivePomodoro() {
+  return useQuery({
+    queryKey: ['pomodoro', 'active'],
+    queryFn: () => api<{ session: PomodoroSession | null }>('/pomodoro/active/'),
+  })
+}
+
+export function useStartPomodoro() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { work_minutes: number; break_minutes: number; planned_sets: number }) =>
+      api<PomodoroSession>('/pomodoro/', 'POST', data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pomodoro'] }),
+  })
+}
+
+export function useCompletePomodoroSet() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      api<{ session: PomodoroSession; xp_change: number; finished: boolean }>(`/pomodoro/${id}/complete_set/`, 'POST'),
+    onSuccess: () => refreshAfterChange(queryClient),
+  })
+}
+
+export function useStopPomodoro() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api<{ session: PomodoroSession }>(`/pomodoro/${id}/stop/`, 'POST'),
+    onSuccess: () => refreshAfterChange(queryClient),
+  })
 }

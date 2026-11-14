@@ -107,3 +107,20 @@ def progress_toward(user):
     progress = {slug: (completed, needed) for needed, slug in TASK_MILESTONES}
     progress['most-classes'] = (_busiest_term_size(user), MOST_CLASSES_OVER + 1)
     return progress
+
+
+STUDY_SESSION_MINUTES = 4 * 60  # Study, Study, Study: finish a session this long
+POMODORO_STOPS = 10             # Time Traveler
+
+
+def after_pomodoro_finished(session):
+    length = session.planned_sets * (session.work_minutes + session.break_minutes)
+    if length >= STUDY_SESSION_MINUTES:
+        unlock(session.user, 'study-study-study')
+
+
+def after_pomodoro_stopped(user):
+    Activity.objects.create(user=user, kind=Activity.Kind.POMODORO_STOPPED)
+    stops = Activity.objects.filter(user=user, kind=Activity.Kind.POMODORO_STOPPED).count()
+    if stops >= POMODORO_STOPS:
+        unlock(user, 'time-traveler')

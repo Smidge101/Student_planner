@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . import progress
-from .models import Activity, Assignment, CalendarEvent, Course, UserAchievement, XPEvent
+from .models import Activity, Assignment, CalendarEvent, Course, PomodoroSession, UserAchievement, XPEvent
 
 User = get_user_model()
 JSON = 'application/json'
@@ -353,3 +353,110 @@ class AchievementPageTests(APITest):
         ben = make_user('ben')
         Assignment.objects.create(user=ben, title='Ben', due_at=timezone.now(), completed_at=timezone.now())
         self.assertEqual(self.client.get('/api/progress/').json()['tasks_completed'], 0)
+
+
+class PomodoroAPITests(APITest):
+    def start(self, work=25, rest=5, sets=4):
+        response = self.post('/api/pomodoro/', {'work_minutes': work, 'break_minutes': rest, 'planned_sets': sets})
+        self.assertEqual(response.status_code, 201, response.content)
+        return response.json()
+
+    def rewind(self, session, minutes):
+        """Pretend the session started `minutes` ago."""
+        PomodoroSession.objects.filter(pk=session['id']).update(
+            started_at=timezone.now() - timedelta(minutes=minutes)
+        )
+
+    def test_full_session_awards_blocks_and_bonus(self):
+        session = self.start(work=25, rest=5, sets=2)
+        self.assertEqual((session['block_xp'], session['bonus_xp']), (5, 5))
+        self.rewind(session, 25)
+        first = self.post(f"/api/pomodoro/{session['id']}/complete_set/").json()
+        self.assertEqual((first['xp_change'], first['finished']), (5, False))
+        self.rewind(session, 55)
+        last = self.post(f"/api/pomodoro/{session['id']}/complete_set/").json()
+        self.assertEqual((last['xp_change'], last['finished']), (5 + 5, True))
+        self.assertIsNotNone(last['session']['ended_at'])
+        self.assertEqual(progress.total_xp(self.ana), 15)
+        # Finished sessions don't pay out again.
+        again = self.post(f"/api/pomodoro/{session['id']}/complete_set/").json()
+        self.assertEqual(again['xp_change'], 0)
+        self.assertEqual(self.client.get('/api/progress/').json()['pomodoro_minutes'], 50)
+
+    def test_cannot_finish_a_block_early(self):
+        session = self.start(work=25)
+        self.rewind(session, 10)
+        response = self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(progress.total_xp(self.ana), 0)
+
+    def test_second_block_needs_two_blocks_of_time(self):
+        session = self.start(work=25)
+        self.rewind(session, 26)
+        self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        response = self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        self.assertEqual(response.status_code, 400)
+
+    def test_only_one_session_at_a_time_and_resume(self):
+        session = self.start()
+        self.assertEqual(self.post('/api/pomodoro/', {
+            'work_minutes': 25, 'break_minutes': 5, 'planned_sets': 1,
+        }).status_code, 409)
+        self.assertEqual(self.client.get('/api/pomodoro/active/').json()['session']['id'], session['id'])
+        self.post(f"/api/pomodoro/{session['id']}/stop/")
+        self.assertIsNone(self.client.get('/api/pomodoro/active/').json()['session'])
+        self.start()  # allowed again
+
+    def test_stop_keeps_xp_from_finished_blocks(self):
+        session = self.start(work=30, sets=3)
+        self.rewind(session, 30)
+        self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        stopped = self.post(f"/api/pomodoro/{session['id']}/stop/").json()['session']
+        self.assertTrue(stopped['stopped_early'])
+        self.assertEqual(progress.total_xp(self.ana), 6)
+        # A stopped session can't earn more.
+        self.rewind(session, 200)
+        self.assertEqual(self.post(f"/api/pomodoro/{session['id']}/complete_set/").json()['xp_change'], 0)
+
+    def test_limits(self):
+        for bad in [
+            {'work_minutes': 0, 'break_minutes': 5, 'planned_sets': 4},
+            {'work_minutes': 25, 'break_minutes': 5, 'planned_sets': 13},
+            {'work_minutes': 60, 'break_minutes': 10, 'planned_sets': 7},  # 7h of work
+        ]:
+            self.assertEqual(self.post('/api/pomodoro/', bad).status_code, 400, bad)
+
+    def test_sessions_cannot_be_edited_or_deleted(self):
+        session = self.start()
+        self.assertEqual(self.patch(f"/api/pomodoro/{session['id']}/", {'planned_sets': 1}).status_code, 405)
+        self.assertEqual(self.client.delete(f"/api/pomodoro/{session['id']}/").status_code, 405)
+
+    def test_cannot_touch_another_users_session(self):
+        ben = make_user('ben')
+        bens = PomodoroSession.objects.create(user=ben, work_minutes=25, break_minutes=5, planned_sets=4)
+        PomodoroSession.objects.filter(pk=bens.pk).update(started_at=timezone.now() - timedelta(hours=3))
+        self.assertEqual(self.post(f'/api/pomodoro/{bens.pk}/complete_set/').status_code, 404)
+        self.assertEqual(self.post(f'/api/pomodoro/{bens.pk}/stop/').status_code, 404)
+        self.assertIsNone(self.client.get('/api/pomodoro/active/').json()['session'])
+
+    def test_study_study_study_after_four_hour_session(self):
+        session = self.start(work=50, rest=10, sets=4)  # 4 x 60 min = 4 hours
+        for done in range(1, 5):
+            self.rewind(session, done * 50 + 1)
+            self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        self.assertIn('study-study-study', self.unlocked())
+
+    def test_shorter_session_does_not_unlock_study_badge(self):
+        session = self.start(work=25, rest=5, sets=2)
+        self.rewind(session, 60)
+        self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        self.post(f"/api/pomodoro/{session['id']}/complete_set/")
+        self.assertNotIn('study-study-study', self.unlocked())
+
+    def test_time_traveler_after_ten_stops(self):
+        for i in range(10):
+            session = self.start()
+            self.post(f"/api/pomodoro/{session['id']}/stop/")
+            if i < 9:
+                self.assertNotIn('time-traveler', self.unlocked())
+        self.assertIn('time-traveler', self.unlocked())

@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from . import progress
-from .models import Assignment, CalendarEvent, ClassMeeting, Course, Term
+from .models import Assignment, CalendarEvent, ClassMeeting, Course, PomodoroSession, Term
 
 
 class OwnedPrimaryKeyField(serializers.PrimaryKeyRelatedField):
@@ -148,4 +148,39 @@ class CalendarEventSerializer(serializers.ModelSerializer):
         end = data.get('end_at', getattr(self.instance, 'end_at', None))
         if start and end and end < start:
             raise serializers.ValidationError({'end_at': 'An event must end after it starts.'})
+        return data
+
+
+# 1 to 12 sets and at most 6 hours of work ("1-6 hour study sessions").
+POMODORO_MAX_WORK_MINUTES = 6 * 60
+
+
+class PomodoroSessionSerializer(serializers.ModelSerializer):
+    work_minutes = serializers.IntegerField(min_value=1, max_value=120)
+    break_minutes = serializers.IntegerField(min_value=1, max_value=60)
+    planned_sets = serializers.IntegerField(min_value=1, max_value=12)
+    block_xp = serializers.SerializerMethodField()
+    bonus_xp = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PomodoroSession
+        fields = [
+            'id', 'work_minutes', 'break_minutes', 'planned_sets', 'completed_sets',
+            'started_at', 'ended_at', 'stopped_early', 'block_xp', 'bonus_xp',
+        ]
+        read_only_fields = ['completed_sets', 'started_at', 'ended_at', 'stopped_early']
+
+    def get_block_xp(self, obj):
+        return progress.pomodoro_block_xp(obj.work_minutes)
+
+    def get_bonus_xp(self, obj):
+        return progress.pomodoro_bonus_xp(obj)
+
+    def validate(self, data):
+        total = data['work_minutes'] * data['planned_sets']
+        if total > POMODORO_MAX_WORK_MINUTES:
+            hours, minutes = divmod(total, 60)
+            raise serializers.ValidationError({
+                'planned_sets': f'That is {hours}h {minutes}m of work. Keep a session to 6 hours or less.'
+            })
         return data

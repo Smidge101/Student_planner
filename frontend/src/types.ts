@@ -134,6 +134,20 @@ export interface ProgressSummary {
   tasks_completed: number
   events_completed: number
   xp_earned: number
+  pomodoro_minutes: number
   xp_values: Record<'homework' | 'quiz' | 'exam' | 'event', number>
   recent_xp: { id: number; amount: number; label: string; created_at: string }[]
+}
+
+export interface PomodoroSession {
+  id: number
+  work_minutes: number
+  break_minutes: number
+  planned_sets: number
+  completed_sets: number
+  started_at: string
+  ended_at: string | null
+  stopped_early: boolean
+  block_xp: number
+  bonus_xp: number
 }

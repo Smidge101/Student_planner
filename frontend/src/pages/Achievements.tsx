@@ -1,7 +1,8 @@
-import { CalendarCheck, CheckCheck, Lock, Sparkles, Star } from 'lucide-react'
+import { CalendarCheck, CheckCheck, Lock, Sparkles, Star, Timer } from 'lucide-react'
 
 import { useMe } from '../auth'
 import { badgeIcon } from '../badges'
+import { formatMinutes } from '../pomodoro'
 import { useAchievements, useProgressSummary } from '../queries'
 import type { AchievementStatus } from '../types'
 
@@ -48,6 +49,7 @@ export default function Achievements() {
         <dl className="stats">
           <div><dt>Tasks done</dt><dd><CheckCheck aria-hidden="true" /> {s?.tasks_completed ?? '–'}</dd></div>
           <div><dt>Events done</dt><dd><CalendarCheck aria-hidden="true" /> {s?.events_completed ?? '–'}</dd></div>
+          <div><dt>Focus time</dt><dd><Timer aria-hidden="true" /> {s ? formatMinutes(s.pomodoro_minutes) : '–'}</dd></div>
           <div><dt>XP earned</dt><dd><Sparkles aria-hidden="true" /> {s?.xp_earned ?? '–'}</dd></div>
         </dl>
       </section>
@@ -75,7 +77,8 @@ export default function Achievements() {
               <li><span>Finish a quiz</span><span className="xp-chip">+{s.xp_values.quiz} XP</span></li>
               <li><span>Finish an exam</span><span className="xp-chip">+{s.xp_values.exam} XP</span></li>
               <li><span>Complete a calendar event</span><span className="xp-chip">+{s.xp_values.event} XP</span></li>
-              <li><span>Pomodoro focus sessions</span><span className="muted small">Coming soon</span></li>
+              <li><span>Pomodoro focus (per 5 min)</span><span className="xp-chip">+1 XP</span></li>
+              <li><span>Finish a whole Pomodoro session</span><span className="xp-chip">+1 XP / 10 min</span></li>
             </ul>
           )}
           <p className="muted small earn-note">Unchecking something takes its XP back.</p>

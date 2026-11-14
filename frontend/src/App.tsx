@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { GuestOnly, RequireAuth } from './components/RouteGuards'
 import AppLayout from './components/AppLayout'
+import Pomodoro from './pages/Pomodoro'
 import Achievements from './pages/Achievements'
 import Calendar from './pages/Calendar'
 import ClassDetail from './pages/ClassDetail'
@@ -26,7 +27,7 @@ export default function App() {
         <Route path="/classes" element={<Classes />} />
         <Route path="/classes/:id" element={<ClassDetail />} />
         <Route path="/calendar" element={<Calendar />} />
-        <Route path="/pomodoro" element={<Placeholder title="Pomodoro" phase="Pomodoro timer" />} />
+        <Route path="/pomodoro" element={<Pomodoro />} />
         <Route path="/settings" element={<Placeholder title="Settings" phase="Settings and customization" />} />
         <Route path="/help" element={<Placeholder title="Help" phase="Help page and bug reports" />} />
       </Route>

@@ -1,6 +1,6 @@
 from datetime import timedelta, timezone as dt_timezone
 
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers, status, viewsets
@@ -14,6 +14,7 @@ from .models import (
     CalendarEvent,
     ClassMeeting,
     Course,
+    PomodoroSession,
     Term,
     UserAchievement,
     XPEvent,
@@ -22,6 +23,7 @@ from .serializers import (
     AssignmentSerializer,
     CalendarEventSerializer,
     CourseSerializer,
+    PomodoroSessionSerializer,
     TermSerializer,
 )
 
@@ -167,6 +169,55 @@ class CalendarEventViewSet(OwnedViewSet):
         return self._toggle(progress.uncomplete_event)
 
 
+class PomodoroViewSet(OwnedViewSet):
+    """Study timer sessions.
+
+    POST /pomodoro/ starts one (only one can run at a time).
+    POST /pomodoro/<id>/complete_set/ after each work block (awards XP; checked against the clock).
+    POST /pomodoro/<id>/stop/ ends one early. GET /pomodoro/active/ resumes after a reload.
+    Sessions can't be edited or deleted: they're the record behind earned XP.
+    """
+
+    serializer_class = PomodoroSessionSerializer
+    queryset = PomodoroSession.objects.all()
+    http_method_names = ['get', 'post']
+
+    def create(self, request, *args, **kwargs):
+        if self.get_queryset().filter(ended_at__isnull=True).exists():
+            return Response(
+                {'detail': 'You already have a session running. Stop it before starting a new one.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().create(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        session = self.get_queryset().filter(ended_at__isnull=True).first()
+        return Response({'session': self.get_serializer(session).data if session else None})
+
+    @action(detail=True, methods=['post'])
+    def complete_set(self, request, pk=None):
+        session = self.get_object()
+        try:
+            xp, finished = progress.complete_pomodoro_set(session)
+        except progress.PomodoroTooEarly:
+            return Response({'detail': 'That work block is not over yet.'}, status=status.HTTP_400_BAD_REQUEST)
+        session.refresh_from_db()
+        if finished and xp:
+            achievements.after_pomodoro_finished(session)
+        return Response({'session': self.get_serializer(session).data, 'xp_change': xp, 'finished': finished})
+
+    @action(detail=True, methods=['post'])
+    def stop(self, request, pk=None):
+        session = self.get_object()
+        if session.ended_at is None:
+            session.ended_at = timezone.now()
+            session.stopped_early = True
+            session.save(update_fields=['ended_at', 'stopped_early'])
+            achievements.after_pomodoro_stopped(request.user)
+        return Response({'session': self.get_serializer(session).data})
+
+
 @api_view(['GET'])
 def unseen_achievements(request):
     """Unlocks the app hasn't shown a popup for yet."""
@@ -216,7 +267,7 @@ def _xp_label(row):
     """What an XP ledger row was for, for the history list."""
     thing = row.assignment or row.event
     if row.source == XPEvent.Source.POMODORO:
-        return 'Focus session'
+        return 'Pomodoro focus block'
     name = thing.title if thing else 'a deleted item'
     return f'Undid "{name}"' if row.source == XPEvent.Source.UNDO else f'Finished "{name}"'
 
@@ -232,6 +283,10 @@ def progress_summary(request):
         'events_completed': CalendarEvent.objects.filter(user=user, completed_at__isnull=False).count(),
         'xp_earned': ledger.filter(amount__gt=0).aggregate(total=Sum('amount'))['total'] or 0,
         'xp_values': {**progress.XP_BY_KIND, 'event': progress.XP_PER_EVENT},
+        'pomodoro_minutes': (
+            PomodoroSession.objects.filter(user=user)
+            .aggregate(total=Sum(F('completed_sets') * F('work_minutes')))['total'] or 0
+        ),
         'recent_xp': [
             {'id': r.id, 'amount': r.amount, 'label': _xp_label(r), 'created_at': r.created_at}
             for r in recent

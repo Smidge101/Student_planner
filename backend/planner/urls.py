@@ -8,6 +8,7 @@ router.register('terms', views.TermViewSet, basename='term')
 router.register('courses', views.CourseViewSet, basename='course')
 router.register('assignments', views.AssignmentViewSet, basename='assignment')
 router.register('events', views.CalendarEventViewSet, basename='event')
+router.register('pomodoro', views.PomodoroViewSet, basename='pomodoro')
 
 urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
