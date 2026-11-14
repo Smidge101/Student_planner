@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { GuestOnly, RequireAuth } from './components/RouteGuards'
 import AppLayout from './components/AppLayout'
+import Achievements from './pages/Achievements'
 import Calendar from './pages/Calendar'
 import ClassDetail from './pages/ClassDetail'
 import Classes from './pages/Classes'
@@ -21,6 +22,7 @@ export default function App() {
 
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/achievements" element={<Achievements />} />
         <Route path="/classes" element={<Classes />} />
         <Route path="/classes/:id" element={<ClassDetail />} />
         <Route path="/calendar" element={<Calendar />} />

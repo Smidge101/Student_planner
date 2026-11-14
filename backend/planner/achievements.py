@@ -61,15 +61,7 @@ def after_task_completed(user):
 
 
 def after_course_added(user):
-    busiest_term = (
-        Course.objects.filter(user=user)
-        .values('term')
-        .annotate(n=Count('id'))
-        .order_by('-n')
-        .values_list('n', flat=True)
-        .first()
-    )
-    if busiest_term and busiest_term > MOST_CLASSES_OVER:
+    if _busiest_term_size(user) > MOST_CLASSES_OVER:
         unlock(user, 'most-classes')
 
 
@@ -93,3 +85,25 @@ def after_event_saved(event):
     ).count()
     if in_week >= EVENTS_IN_A_WEEK:
         unlock(event.user, 'busy-bee')
+
+
+def _busiest_term_size(user):
+    return (
+        Course.objects.filter(user=user)
+        .values('term')
+        .annotate(n=Count('id'))
+        .order_by('-n')
+        .values_list('n', flat=True)
+        .first()
+    ) or 0
+
+
+def progress_toward(user):
+    """Progress bars for visible achievements that count something.
+
+    Hidden achievements get no progress bar, so they stay a surprise.
+    """
+    completed = Assignment.objects.filter(user=user, completed_at__isnull=False).count()
+    progress = {slug: (completed, needed) for needed, slug in TASK_MILESTONES}
+    progress['most-classes'] = (_busiest_term_size(user), MOST_CLASSES_OVER + 1)
+    return progress

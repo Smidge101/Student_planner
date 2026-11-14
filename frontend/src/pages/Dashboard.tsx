@@ -111,24 +111,29 @@ function WelcomeCard({ me, achievements }: { me: Me; achievements?: DashboardDat
           <span className="xp-label">{me.xp} / {me.next_level_xp} XP</span>
         </div>
 
-        <ul className="badges" aria-label="Achievements">
-          {achievements?.length ? (
-            achievements.map((a) => {
-              const Icon = badgeIcon(a.slug)
-              return (
-                <li key={a.slug} className="badge" title={`${a.name}: ${a.description}`}>
-                  <Icon aria-hidden="true" />
-                  <span className="sr-only">{a.name}</span>
-                </li>
-              )
-            })
-          ) : (
-            <li className="badge-empty">
-              <span className="badge locked" aria-hidden="true"><Lock /></span>
-              <span className="muted">Complete tasks to earn your first badge.</span>
-            </li>
-          )}
-        </ul>
+        <div className="badges-row">
+          <ul className="badges" aria-label="Achievements">
+            {achievements?.length ? (
+              achievements.map((a) => {
+                const Icon = badgeIcon(a.slug)
+                return (
+                  <li key={a.slug} className="badge" title={`${a.name}: ${a.description}`}>
+                    <Icon aria-hidden="true" />
+                    <span className="sr-only">{a.name}</span>
+                  </li>
+                )
+              })
+            ) : (
+              <li className="badge-empty">
+                <span className="badge locked" aria-hidden="true"><Lock /></span>
+                <span className="muted">Complete tasks to earn your first badge.</span>
+              </li>
+            )}
+          </ul>
+          <Link to="/achievements" className="panel-link">
+            All achievements <ArrowRight aria-hidden="true" />
+          </Link>
+        </div>
       </div>
 
       <div className="theme-picker">

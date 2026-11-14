@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -165,3 +166,8 @@ REST_FRAMEWORK = {
 # Sessions last two weeks; the React app reads the CSRF cookie to send it back.
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
 CSRF_COOKIE_HTTPONLY = False
+
+# Tests create many users; the real (deliberately slow) password hasher made
+# the suite take minutes. Only `manage.py test` uses the fast one.
+if len(sys.argv) > 1 and sys.argv[1] == 'test':
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']

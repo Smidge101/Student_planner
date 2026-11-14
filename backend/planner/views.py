@@ -1,6 +1,6 @@
 from datetime import timedelta, timezone as dt_timezone
 
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Prefetch, Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers, status, viewsets
@@ -8,7 +8,16 @@ from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
 from . import achievements, progress
-from .models import Assignment, CalendarEvent, ClassMeeting, Course, Term, UserAchievement
+from .models import (
+    Achievement,
+    Assignment,
+    CalendarEvent,
+    ClassMeeting,
+    Course,
+    Term,
+    UserAchievement,
+    XPEvent,
+)
 from .serializers import (
     AssignmentSerializer,
     CalendarEventSerializer,
@@ -18,6 +27,7 @@ from .serializers import (
 
 DASHBOARD_LIST_SIZE = 5
 UPCOMING_EVENT_DAYS = 7
+XP_HISTORY_SIZE = 15
 
 
 def _datetime_param(params, name):
@@ -169,6 +179,64 @@ def unseen_achievements(request):
         {'slug': u.achievement.slug, 'name': u.achievement.name, 'description': u.achievement.description}
         for u in rows
     ])
+
+
+@api_view(['GET'])
+def achievement_list(request):
+    """Every achievement with the user's status.
+
+    Hidden ones the user hasn't unlocked yet come back without a name or
+    description, so the API can't be used to spoil them.
+    """
+    unlocked = {
+        u.achievement_id: u.unlocked_at
+        for u in UserAchievement.objects.filter(user=request.user)
+    }
+    counts = achievements.progress_toward(request.user)
+    rows = []
+    for a in Achievement.objects.order_by('hidden', 'id'):
+        unlocked_at = unlocked.get(a.id)
+        secret = a.hidden and unlocked_at is None
+        current, target = counts.get(a.slug, (None, None))
+        rows.append({
+            'slug': None if secret else a.slug,
+            'name': '???' if secret else a.name,
+            'description': 'Hidden achievement. Keep exploring!' if secret else a.description,
+            'hidden': a.hidden,
+            'unlocked': unlocked_at is not None,
+            'unlocked_at': unlocked_at,
+            'progress': None if unlocked_at or current is None else {
+                'current': min(current, target), 'target': target,
+            },
+        })
+    return Response(rows)
+
+
+def _xp_label(row):
+    """What an XP ledger row was for, for the history list."""
+    thing = row.assignment or row.event
+    if row.source == XPEvent.Source.POMODORO:
+        return 'Focus session'
+    name = thing.title if thing else 'a deleted item'
+    return f'Undid "{name}"' if row.source == XPEvent.Source.UNDO else f'Finished "{name}"'
+
+
+@api_view(['GET'])
+def progress_summary(request):
+    """Stats and recent XP for the progress page."""
+    user = request.user
+    ledger = XPEvent.objects.filter(user=user)
+    recent = ledger.select_related('assignment', 'event').order_by('-created_at', '-id')[:XP_HISTORY_SIZE]
+    return Response({
+        'tasks_completed': Assignment.objects.filter(user=user, completed_at__isnull=False).count(),
+        'events_completed': CalendarEvent.objects.filter(user=user, completed_at__isnull=False).count(),
+        'xp_earned': ledger.filter(amount__gt=0).aggregate(total=Sum('amount'))['total'] or 0,
+        'xp_values': {**progress.XP_BY_KIND, 'event': progress.XP_PER_EVENT},
+        'recent_xp': [
+            {'id': r.id, 'amount': r.amount, 'label': _xp_label(r), 'created_at': r.created_at}
+            for r in recent
+        ],
+    })
 
 
 @api_view(['POST'])

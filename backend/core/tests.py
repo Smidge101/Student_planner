@@ -1,6 +1,9 @@
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import Client, TestCase
+from rest_framework.throttling import ScopedRateThrottle
 
 User = get_user_model()
 
@@ -124,6 +127,9 @@ class LoginTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(self.client.get('/api/auth/me/').status_code, 200)
 
+    # Same 10-attempt limit, but per hour, so a slow machine can't let the
+    # one-minute window reset halfway through the test.
+    @mock.patch.dict(ScopedRateThrottle.THROTTLE_RATES, {'auth': '10/hour'})
     def test_login_attempts_are_rate_limited(self):
         for _ in range(10):
             self.post('/api/auth/login/', {'username': 'ana', 'password': 'wrong'})

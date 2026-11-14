@@ -293,3 +293,63 @@ class CalendarEventAPITests(APITest):
     def test_invalid_time_zone_rejected(self):
         response = self.patch('/api/auth/me/', {'timezone': 'Mars/Olympus'})
         self.assertEqual(response.status_code, 400)
+
+
+class AchievementPageTests(APITest):
+    def test_lists_all_achievements_and_hides_secrets(self):
+        rows = self.client.get('/api/achievements/').json()
+        self.assertEqual(len(rows), 11)
+        hidden = [r for r in rows if r['hidden']]
+        self.assertEqual(len(hidden), 6)
+        for row in hidden:
+            self.assertIsNone(row['slug'])
+            self.assertEqual(row['name'], '???')
+            self.assertFalse(row['unlocked'])
+        # Nothing secret leaks anywhere in the response.
+        body = self.client.get('/api/achievements/').content.decode()
+        for secret in ['Busy Bee', 'Bye Bye', 'Time Traveler', 'busy-bee']:
+            self.assertNotIn(secret, body)
+
+    def test_unlocked_hidden_achievement_is_revealed(self):
+        ids = [self.add_course(f'C{i}', c)['id'] for i, c in enumerate(['pink', 'mint', 'sky'])]
+        for course_id in ids:
+            self.client.delete(f'/api/courses/{course_id}/')
+        rows = self.client.get('/api/achievements/').json()
+        bye = next(r for r in rows if r['slug'] == 'bye-bye-byee')
+        self.assertTrue(bye['unlocked'])
+        self.assertEqual(bye['name'], 'Bye Bye Byee!~')
+
+    def test_progress_toward_task_milestones(self):
+        for i in range(3):
+            task = self.add_task(title=f'T{i}')
+            self.post(f"/api/assignments/{task['id']}/complete/")
+        rows = {r['slug']: r for r in self.client.get('/api/achievements/').json() if r['slug']}
+        self.assertEqual(rows['baby-steps']['progress'], {'current': 3, 'target': 10})
+        self.assertEqual(rows['trailblazer']['progress'], {'current': 3, 'target': 50})
+        self.assertEqual(rows['most-classes']['progress'], {'current': 0, 'target': 7})
+
+    def test_progress_summary_and_history(self):
+        task = self.add_task(title='Essay', kind='quiz')
+        self.post(f"/api/assignments/{task['id']}/complete/")
+        self.post(f"/api/assignments/{task['id']}/uncomplete/")
+        self.post(f"/api/assignments/{task['id']}/complete/")
+        body = self.client.get('/api/progress/').json()
+        self.assertEqual(body['tasks_completed'], 1)
+        self.assertEqual(body['xp_earned'], 20)  # two +10 awards; undo isn't "earned"
+        self.assertEqual(body['xp_values']['exam'], 15)
+        self.assertEqual(
+            [(r['amount'], r['label']) for r in body['recent_xp']],
+            [(10, 'Finished "Essay"'), (-10, 'Undid "Essay"'), (10, 'Finished "Essay"')],
+        )
+
+    def test_history_survives_deleted_task(self):
+        task = self.add_task(title='Gone soon')
+        self.post(f"/api/assignments/{task['id']}/complete/")
+        self.client.delete(f"/api/assignments/{task['id']}/")
+        labels = [r['label'] for r in self.client.get('/api/progress/').json()['recent_xp']]
+        self.assertEqual(labels, ['Finished "a deleted item"'])
+
+    def test_progress_is_per_user(self):
+        ben = make_user('ben')
+        Assignment.objects.create(user=ben, title='Ben', due_at=timezone.now(), completed_at=timezone.now())
+        self.assertEqual(self.client.get('/api/progress/').json()['tasks_completed'], 0)

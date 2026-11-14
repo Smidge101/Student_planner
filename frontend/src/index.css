@@ -467,3 +467,63 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
   .month-cell .chip-title { display: none; }
   .event-form { grid-template-columns: 1fr; }
 }
+
+/* ---------- Achievements page ---------- */
+.progress-page { display: grid; gap: 20px; max-width: 1100px; }
+.progress-page .page-title { margin-bottom: 0; }
+.badges-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.badges-row .badges { margin: 0; }
+.level-card {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding: 24px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface) 70%);
+}
+.level-badge { position: relative; display: grid; place-items: center; width: 96px; height: 96px; color: var(--accent); }
+.level-badge svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--accent-soft); stroke-width: 1.5; }
+.level-badge span { position: relative; font-size: 1.7rem; font-weight: 800; color: var(--accent-text); margin-top: 6px; }
+.level-info { display: grid; gap: 10px; min-width: 0; }
+.level-info h2 { font-size: 1.6rem; }
+.level-info .xp-bar { max-width: 420px; }
+.stats { display: flex; gap: 12px; margin: 0; flex-wrap: wrap; }
+.stats div { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 16px; min-width: 110px; }
+.stats dt { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+.stats dd { margin: 2px 0 0; font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.stats dd svg { color: var(--accent-text); width: 0.9em; height: 0.9em; }
+
+.achievement-grid { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.achievement {
+  display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 14px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2);
+}
+.achievement-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; }
+.achievement-icon svg { width: 26px; height: 26px; }
+.achievement-unlocked { background: var(--accent-softer); border-color: var(--accent-soft); }
+.achievement-unlocked .achievement-icon { background: var(--accent); color: #fff; box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+.achievement-locked .achievement-icon { background: var(--surface); border: 2px dashed var(--border); color: var(--muted); }
+.achievement-text { display: grid; gap: 3px; min-width: 0; }
+.achievement-name { font-weight: 800; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.achievement-locked .achievement-name { color: var(--muted); }
+.hidden-tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); }
+.achievement-date { font-size: 0.8rem; font-weight: 700; color: var(--accent-text); }
+.mini-progress { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.mini-progress .xp-bar { height: 8px; flex: 1; }
+
+.progress-columns { display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; align-items: start; }
+.earn-list, .history-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.earn-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.earn-note { margin-top: 10px; }
+.history-list li { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.history-list li:last-child { border-bottom: 0; }
+.history-amount { font-weight: 800; color: var(--accent-text); text-align: right; }
+.history-amount.negative { color: var(--danger); }
+.history-label { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .level-card { grid-template-columns: auto 1fr; }
+  .stats { grid-column: 1 / -1; }
+  .progress-columns { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .level-card { grid-template-columns: 1fr; justify-items: start; }
+  .history-list li { grid-template-columns: 44px 1fr; }
+  .history-list time { grid-column: 2; }
+}

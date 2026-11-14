@@ -4,10 +4,19 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
-import type { Assignment, CalendarEvent, Course, Meeting, PastelColor, TaskKind } from './types'
+import type {
+  AchievementStatus,
+  Assignment,
+  CalendarEvent,
+  Course,
+  Meeting,
+  PastelColor,
+  ProgressSummary,
+  TaskKind,
+} from './types'
 
 export function refreshAfterChange(queryClient: QueryClient, deletedCourseId?: number) {
-  for (const key of ['courses', 'assignments', 'events', 'dashboard', 'me', 'achievements-unseen']) {
+  for (const key of ['courses', 'assignments', 'events', 'dashboard', 'me', 'achievements-unseen', 'achievements', 'progress']) {
     queryClient.invalidateQueries({
       queryKey: [key],
       // Don't refetch a class that was just deleted (it would 404).
@@ -154,4 +163,14 @@ export function useToggleEvent() {
       api<{ event: CalendarEvent; xp_change: number }>(`/events/${id}/${done ? 'complete' : 'uncomplete'}/`, 'POST'),
     onSuccess: () => refreshAfterChange(queryClient),
   })
+}
+
+// ---------- Achievements & progress ----------
+
+export function useAchievements() {
+  return useQuery({ queryKey: ['achievements'], queryFn: () => api<AchievementStatus[]>('/achievements/') })
+}
+
+export function useProgressSummary() {
+  return useQuery({ queryKey: ['progress'], queryFn: () => api<ProgressSummary>('/progress/') })
 }

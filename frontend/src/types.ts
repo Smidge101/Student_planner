@@ -119,3 +119,21 @@ export interface CalendarEvent {
   xp: number
   created_at: string
 }
+
+export interface AchievementStatus {
+  slug: string | null // null while a hidden achievement is still secret
+  name: string
+  description: string
+  hidden: boolean
+  unlocked: boolean
+  unlocked_at: string | null
+  progress: { current: number; target: number } | null
+}
+
+export interface ProgressSummary {
+  tasks_completed: number
+  events_completed: number
+  xp_earned: number
+  xp_values: Record<'homework' | 'quiz' | 'exam' | 'event', number>
+  recent_xp: { id: number; amount: number; label: string; created_at: string }[]
+}
